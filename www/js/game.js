@@ -70,7 +70,7 @@ function screenHome() {
     <div class="screen" style="justify-content:center; flex:1;">
       <div class="title-hero">
         <div class="logo">✂️💇</div>
-        <h1>המספרה של עלמה</h1>
+        <h1>המספרה של עלמה וענבל</h1>
         <p>תספורות, בגדים ותפירה לילדה ולחיות מחמד</p>
       </div>
       <button class="big-btn" data-action="nav" data-target="choose">בואי נתחיל! 🌟</button>

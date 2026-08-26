@@ -1,7 +1,7 @@
 {
   "name": "alma-game-haircuts",
   "version": "1.0.0",
-  "description": "המספרה של עלמה - a haircut & sewing salon game for a girl and a pet",
+  "description": "המספרה של עלמה וענבל - a haircut & sewing salon game for a girl and a pet",
   "private": true,
   "scripts": {
     "start": "npx http-server www -p 8080 -c-1",
