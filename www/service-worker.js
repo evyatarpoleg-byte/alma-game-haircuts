@@ -1,4 +1,4 @@
-const CACHE_NAME = 'alma-salon-v1';
+const CACHE_NAME = 'alma-salon-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -25,18 +25,18 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-first: always prefer the latest deployed files when online,
+// and only fall back to the cache when the network is unavailable
+// (so the game still works offline once it's been opened before).
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => cached);
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
