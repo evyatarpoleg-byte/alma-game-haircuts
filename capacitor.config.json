@@ -1,0 +1,9 @@
+{
+  "appId": "com.almagames.salon",
+  "appName": "המספרה של עלמה",
+  "webDir": "www",
+  "backgroundColor": "#FFF3EC",
+  "android": {
+    "backgroundColor": "#FFF3EC"
+  }
+}

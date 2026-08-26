@@ -1,0 +1,19 @@
+{
+  "name": "alma-game-haircuts",
+  "version": "1.0.0",
+  "description": "המספרה של עלמה - a haircut & sewing salon game for a girl and a pet",
+  "private": true,
+  "scripts": {
+    "start": "npx http-server www -p 8080 -c-1",
+    "cap:add:android": "cap add android",
+    "cap:sync": "cap sync android",
+    "cap:open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

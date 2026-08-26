@@ -1,0 +1,16 @@
+{
+  "name": "המספרה של עלמה",
+  "short_name": "עלמה",
+  "description": "משחק תספורות ותפירת בגדים לילדה ולחיה",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF3EC",
+  "theme_color": "#FF8FB1",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
