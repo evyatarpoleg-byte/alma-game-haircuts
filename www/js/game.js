@@ -2,9 +2,9 @@ import {
   SPECIES, HAIRSTYLES, OUTFITS, PATTERNS, COLORS,
   buildCharacterSVG, hairIcon, outfitIcon, patternSwatch,
   randomStrands, strandsOverlay, sewDots, sewOverlay,
-} from './characters.js?v=4';
-import { playSnip, playStitch, playWrong, playSuccess, playClick, playStar, playSave } from './audio.js?v=4';
-import { loadGallery, saveEntry, deleteEntry } from './storage.js?v=4';
+} from './characters.js?v=5';
+import { playSnip, playStitch, playWrong, playSuccess, playClick, playStar, playSave } from './audio.js?v=5';
+import { loadGallery, saveEntry, deleteEntry } from './storage.js?v=5';
 
 const STEP_SCREENS = ['trim', 'hairstyle', 'sew', 'outfitstyle'];
 

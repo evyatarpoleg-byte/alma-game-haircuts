@@ -73,6 +73,40 @@ function lighten(hex, amt) {
   return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }
 
+function darken(hex, amt) {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  const mix = (v) => Math.round(v * (1 - amt));
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
+// A radial gradient (light top-left, true colour in the middle, darker
+// edge) that makes a flat shape read as a glossy rounded 3D volume.
+let gradCounter = 0;
+function radialShade(baseColor, opts = {}) {
+  gradCounter += 1;
+  const id = `sh${gradCounter}`;
+  const light = lighten(baseColor, opts.lightAmt ?? 0.5);
+  const dark = darken(baseColor, opts.darkAmt ?? 0.3);
+  const cx = opts.cx ?? '32%';
+  const cy = opts.cy ?? '28%';
+  const r = opts.r ?? '78%';
+  return {
+    fill: `url(#${id})`,
+    defs: `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}">
+      <stop offset="0%" stop-color="${light}"/>
+      <stop offset="55%" stop-color="${baseColor}"/>
+      <stop offset="100%" stop-color="${dark}"/>
+    </radialGradient>`,
+  };
+}
+
+// One consistent ink outline colour for every shape, so the gradient
+// fills read as a single glossy 3D toy figure instead of separate flats.
+const OUTLINE = '#3A2E39';
+
 const EYE_COLORS = {
   girl: '#8B5E3C',
   cat: '#4CAF6D',
@@ -118,8 +152,10 @@ function hairShine(hx, hy, hr, color) {
   return `<ellipse cx="${hx - hr * 0.32}" cy="${hy - hr * 0.62}" rx="${hr * 0.32}" ry="${hr * 0.18}" fill="${shine}" opacity="0.65" transform="rotate(-24 ${hx - hr * 0.32} ${hy - hr * 0.62})"/>`;
 }
 
-function hairShape(style, color, hx, hy, hr) {
-  return hairBase(style, color, hx, hy, hr) + hairShine(hx, hy, hr, color);
+function hairShape(style, color, hx, hy, hr, fillOverride, withOutline) {
+  const base = hairBase(style, fillOverride || color, hx, hy, hr);
+  const wrapped = withOutline ? `<g stroke="${OUTLINE}" stroke-width="2.5" stroke-linejoin="round">${base}</g>` : base;
+  return wrapped + hairShine(hx, hy, hr, color);
 }
 
 function hairBase(style, color, hx, hy, hr) {
@@ -285,33 +321,45 @@ function faceFeatures(speciesId) {
 export function buildCharacterSVG(config, overlayMarkup = '') {
   const sp = getSpecies(config.species);
   const extras = speciesExtras(sp.id, sp.skin, sp.skinShade);
-  const hair = config.hair && config.hair.style ? hairShape(config.hair.style, config.hair.color, HEAD_CX, HEAD_CY, HEAD_R) : '';
+  const skin = radialShade(sp.skin);
+  const hairShade = config.hair && config.hair.style ? radialShade(config.hair.color) : null;
+  const hair = hairShade
+    ? hairShape(config.hair.style, config.hair.color, HEAD_CX, HEAD_CY, HEAD_R, hairShade.fill, true)
+    : '';
+  const hairDefs = hairShade ? hairShade.defs : '';
+
   let outfitMarkup = '';
-  let defs = '';
+  let outfitDefs = '';
   if (config.outfit && config.outfit.style) {
-    const { fill, defs: d } = patternDef(config.outfit.pattern || 'plain', config.outfit.color);
-    outfitMarkup = outfitShape(config.outfit.style, fill);
-    defs = d;
+    const pattern = config.outfit.pattern || 'plain';
+    const shaded = pattern === 'plain' ? radialShade(config.outfit.color) : patternDef(pattern, config.outfit.color);
+    outfitMarkup = `<g stroke="${OUTLINE}" stroke-width="2.5" stroke-linejoin="round">${outfitShape(config.outfit.style, shaded.fill)}</g>`;
+    outfitDefs = shaded.defs;
   }
 
   return `
   <svg viewBox="0 0 300 420" xmlns="http://www.w3.org/2000/svg">
-    <defs>${defs}</defs>
-    ${extras.tail}
-    <!-- legs -->
-    <rect x="118" y="352" width="22" height="46" rx="10" fill="${sp.skin}"/>
-    <rect x="160" y="352" width="22" height="46" rx="10" fill="${sp.skin}"/>
-    <!-- arms -->
-    <ellipse cx="82" cy="240" rx="17" ry="46" fill="${sp.skin}" transform="rotate(12 82 240)"/>
-    <ellipse cx="218" cy="240" rx="17" ry="46" fill="${sp.skin}" transform="rotate(-12 218 240)"/>
-    <!-- torso base -->
-    <path d="M 108 176 Q 150 160 192 176 L 206 370 Q 150 390 94 370 Z" fill="${sp.skin}"/>
+    <defs>${skin.defs}${hairDefs}${outfitDefs}</defs>
+    <!-- ground shadow -->
+    <ellipse cx="150" cy="404" rx="68" ry="12" fill="#000000" opacity="0.14"/>
+    <g stroke="${OUTLINE}" stroke-width="2.5" stroke-linejoin="round">
+      ${extras.tail}
+      <!-- legs -->
+      <rect x="118" y="352" width="22" height="46" rx="10" fill="${skin.fill}"/>
+      <rect x="160" y="352" width="22" height="46" rx="10" fill="${skin.fill}"/>
+      <!-- arms -->
+      <ellipse cx="82" cy="240" rx="17" ry="46" fill="${skin.fill}" transform="rotate(12 82 240)"/>
+      <ellipse cx="218" cy="240" rx="17" ry="46" fill="${skin.fill}" transform="rotate(-12 218 240)"/>
+      <!-- torso base -->
+      <path d="M 108 176 Q 150 160 192 176 L 206 370 Q 150 390 94 370 Z" fill="${skin.fill}"/>
+    </g>
     ${outfitMarkup}
     <!-- ears behind head -->
-    ${extras.earsBack}
+    <g stroke="${OUTLINE}" stroke-width="2" stroke-linejoin="round">${extras.earsBack}</g>
     <!-- head -->
-    <circle cx="${HEAD_CX}" cy="${HEAD_CY}" r="${HEAD_R}" fill="${sp.skin}"/>
-    ${extras.snout}
+    <circle cx="${HEAD_CX}" cy="${HEAD_CY}" r="${HEAD_R}" fill="${skin.fill}" stroke="${OUTLINE}" stroke-width="2.5"/>
+    <ellipse cx="${HEAD_CX - HEAD_R * 0.4}" cy="${HEAD_CY - HEAD_R * 0.55}" rx="${HEAD_R * 0.22}" ry="${HEAD_R * 0.14}" fill="#FFFFFF" opacity="0.4" transform="rotate(-20 ${HEAD_CX - HEAD_R * 0.4} ${HEAD_CY - HEAD_R * 0.55})"/>
+    <g stroke="${OUTLINE}" stroke-width="1.5" stroke-linejoin="round">${extras.snout}</g>
     ${faceFeatures(sp.id)}
     ${extras.whiskers || ''}
     <!-- hair -->
