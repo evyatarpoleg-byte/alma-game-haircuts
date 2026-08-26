@@ -1,12 +1,14 @@
 import {
   SPECIES, HAIRSTYLES, OUTFITS, PATTERNS, COLORS,
-  buildCharacterSVG, hairIcon, outfitIcon, patternSwatch,
-  randomStrands, strandsOverlay, sewDots, sewOverlay,
-} from './characters.js?v=5';
-import { playSnip, playStitch, playWrong, playSuccess, playClick, playStar, playSave } from './audio.js?v=5';
-import { loadGallery, saveEntry, deleteEntry } from './storage.js?v=5';
+  hairIcon, outfitIcon, patternSwatch,
+} from './characters.js?v=6';
+import { playSnip, playStitch, playWrong, playSuccess, playClick, playStar, playSave } from './audio.js?v=6';
+import { loadGallery, saveEntry, deleteEntry } from './storage.js?v=6';
+import * as stage3d from './stage3d.js?v=6';
 
 const STEP_SCREENS = ['trim', 'hairstyle', 'sew', 'outfitstyle'];
+const STRAND_COUNT = 8;
+const SEW_COUNT = 8;
 
 const state = {
   screen: 'home',
@@ -14,9 +16,8 @@ const state = {
   species: null,
   hair: { style: null, color: COLORS[0].hex },
   outfit: { style: null, color: COLORS[3].hex, pattern: 'plain' },
-  strands: [],
+  strandsRemaining: 0,
   sewOrder: [],
-  sewPoints: [],
   hairRating: 0,
   outfitRating: 0,
   saved: false,
@@ -26,30 +27,55 @@ const app = document.getElementById('app');
 const confettiRoot = document.getElementById('confetti-root');
 const toastRoot = document.getElementById('toast-root');
 
+const STAGE_SCREENS = new Set(['trim', 'hairstyle', 'sew', 'outfitstyle', 'rating']);
+
 function resetForNewClient() {
   state.species = null;
   state.hair = { style: null, color: COLORS[0].hex };
   state.outfit = { style: null, color: COLORS[3].hex, pattern: 'plain' };
-  state.strands = [];
+  state.strandsRemaining = 0;
   state.sewOrder = [];
-  state.sewPoints = [];
   state.hairRating = 0;
   state.outfitRating = 0;
   state.saved = false;
 }
 
-function goto(screen) {
-  if (screen === 'sew' && state.sewPoints.length === 0) {
-    state.sewPoints = sewDots();
-  }
-  const enteringRating = screen === 'rating' && state.screen !== 'rating';
-  state.screen = screen;
-  render();
-  if (enteringRating) spawnConfetti();
-}
-
 function currentConfig() {
   return { species: state.species, hair: state.hair, outfit: state.outfit };
+}
+
+// Rebuilds the 3D character to match the current state. Only called at
+// well-defined points (screen entry, a style/color pick) - never on
+// every render (e.g. a star-rating click), so rotation and animation
+// aren't reset on unrelated UI updates.
+function syncStage() {
+  stage3d.setCharacter(currentConfig());
+}
+
+function goto(screen) {
+  const enteringRating = screen === 'rating' && state.screen !== 'rating';
+  state.screen = screen;
+
+  if (screen === 'trim') {
+    syncStage();
+    stage3d.setAutoRotate(false);
+    state.strandsRemaining = STRAND_COUNT;
+    stage3d.addStrandTargets(STRAND_COUNT);
+  } else if (screen === 'hairstyle') {
+    syncStage();
+  } else if (screen === 'sew') {
+    syncStage();
+    stage3d.setAutoRotate(false);
+    state.sewOrder = [];
+    stage3d.addSewTargets(SEW_COUNT);
+  } else if (screen === 'outfitstyle') {
+    syncStage();
+  } else if (screen === 'rating') {
+    syncStage();
+  }
+
+  render();
+  if (enteringRating) spawnConfetti();
 }
 
 function topBar(title, backTo) {
@@ -63,6 +89,10 @@ function topBar(title, backTo) {
 
 function stepDots(activeIndex) {
   return `<div class="progress-dots">${STEP_SCREENS.map((_, i) => `<span class="${i < activeIndex ? 'done' : ''}"></span>`).join('')}</div>`;
+}
+
+function stageWrap(innerHtml = '') {
+  return `<div class="stage-wrap"><div id="stage-slot" class="stage-slot"></div>${innerHtml}</div>`;
 }
 
 function screenHome() {
@@ -95,15 +125,14 @@ function screenChoose() {
 }
 
 function screenTrim() {
-  const allGone = state.strands.length === 0;
-  const svg = buildCharacterSVG({ species: state.species, hair: null, outfit: null }, strandsOverlay(state.strands));
+  const allGone = state.strandsRemaining === 0;
   return `
     ${topBar('שיער פרוע!', 'choose')}
     <div class="screen">
       ${stepDots(0)}
-      <p class="hint">${allGone ? 'מעולה! השיער מוכן לעיצוב ✨' : 'לחצי על כל שערה פרועה כדי לגזור אותה'}</p>
-      <div class="stage-wrap">${svg}</div>
-      <p class="hint">${allGone ? '' : `נגזרו ${8 - state.strands.length}/8`}</p>
+      <p class="hint">${allGone ? 'מעולה! השיער מוכן לעיצוב ✨' : 'לחצי על כל שערה פרועה כדי לגזור אותה - אפשר לגרור כדי לסובב'}</p>
+      ${stageWrap()}
+      <p class="hint">${allGone ? '' : `נגזרו ${STRAND_COUNT - state.strandsRemaining}/${STRAND_COUNT}`}</p>
       ${allGone ? '<button class="big-btn" data-action="nav" data-target="hairstyle">בחירת תספורת ✂️</button>' : ''}
     </div>`;
 }
@@ -119,12 +148,11 @@ function screenHairstyle() {
   const colors = COLORS.map(
     (c) => `<button class="swatch ${state.hair.color === c.hex ? 'selected' : ''} ${c.hex === '#FFFFFF' ? 'white-swatch' : ''}" style="background:${c.hex}" data-action="pick-hair-color" data-id="${c.hex}" aria-label="${c.name}"></button>`
   ).join('');
-  const svg = buildCharacterSVG({ species: state.species, hair: state.hair, outfit: null });
   return `
     ${topBar('בחרי תספורת', 'trim')}
     <div class="screen">
       ${stepDots(1)}
-      <div class="stage-wrap">${svg}</div>
+      ${stageWrap()}
       <span class="section-label">סגנון</span>
       <div class="card-grid">${cards}</div>
       <span class="section-label">צבע שיער</span>
@@ -134,17 +162,13 @@ function screenHairstyle() {
 }
 
 function screenSew() {
-  const done = state.sewOrder.length > 0 && state.sewOrder.length === state.sewPoints.length;
-  const svg = buildCharacterSVG(
-    { species: state.species, hair: state.hair, outfit: null },
-    sewOverlay(state.sewPoints, state.sewOrder)
-  );
+  const done = state.sewOrder.length > 0 && state.sewOrder.length === SEW_COUNT;
   return `
     ${topBar('נתפור בגד!', 'hairstyle')}
     <div class="screen">
       ${stepDots(2)}
-      <p class="hint">${done ? 'תפרת מעולה! 🧵' : 'לחצי על הנקודות לפי הסדר: 1, 2, 3...'}</p>
-      <div class="stage-wrap">${svg}</div>
+      <p class="hint">${done ? 'תפרת מעולה! 🧵' : 'לחצי על הנקודות לפי הסדר: 1, 2, 3... אפשר לסובב כדי למצוא את כולן'}</p>
+      ${stageWrap()}
       ${done ? '<button class="big-btn" data-action="nav" data-target="outfitstyle">בחירת בגד 👗</button>' : ''}
     </div>`;
 }
@@ -167,12 +191,11 @@ function screenOutfitStyle() {
       <span>${p.name}</span>
     </button>`
   ).join('');
-  const svg = buildCharacterSVG({ species: state.species, hair: state.hair, outfit: state.outfit });
   return `
     ${topBar('בחרי בגד', 'sew')}
     <div class="screen">
       ${stepDots(3)}
-      <div class="stage-wrap">${svg}</div>
+      ${stageWrap()}
       <span class="section-label">דגם</span>
       <div class="card-grid">${cards}</div>
       <span class="section-label">צבע בד</span>
@@ -193,12 +216,11 @@ function starsRow(target, value, readonly) {
 }
 
 function screenRating() {
-  const svg = buildCharacterSVG(currentConfig());
   const canSave = state.hairRating > 0 && state.outfitRating > 0;
   return `
     ${topBar('איזה יופי!', 'outfitstyle')}
     <div class="screen">
-      <div class="stage-wrap">${svg}</div>
+      ${stageWrap()}
       <div class="rating-block">
         <h3>כמה אהבת את התספורת? ✂️</h3>
         ${starsRow('hair', state.hairRating, false)}
@@ -230,7 +252,7 @@ function screenGallery() {
       (e) => `
     <div class="gallery-card">
       <button class="del" data-action="delete-entry" data-id="${e.id}" aria-label="מחיקה">🗑️</button>
-      ${buildCharacterSVG(e)}
+      <img src="${e.thumbnail}" alt="" style="width:100%;border-radius:12px;background:#fff" />
       <div class="mini-stars">✂️ ${starsRow('', e.hairRating, true)}</div>
       <div class="mini-stars">👗 ${starsRow('', e.outfitRating, true)}</div>
     </div>`
@@ -255,6 +277,13 @@ function render() {
     default: html = screenHome();
   }
   app.innerHTML = html;
+  if (STAGE_SCREENS.has(state.screen)) {
+    const slot = document.getElementById('stage-slot');
+    if (slot) {
+      slot.appendChild(stage3d.getCanvas());
+      stage3d.refresh();
+    }
+  }
 }
 
 function spawnConfetti() {
@@ -280,39 +309,38 @@ function showToast(msg) {
   setTimeout(() => el.remove(), 2000);
 }
 
-app.addEventListener('click', (e) => {
-  const target = e.target.closest('[data-action], [data-role]');
-  if (!target) return;
-
-  const roleEl = e.target.closest('[data-role]');
-  if (roleEl) {
-    const role = roleEl.dataset.role;
-    const id = roleEl.dataset.id;
-    if (role === 'strand') {
-      state.strands = state.strands.filter((s) => s.id !== id);
-      playSnip();
-      if (state.strands.length === 0) {
-        playSuccess();
-        setTimeout(() => { if (state.screen === 'trim') goto('hairstyle'); }, 900);
-      }
-      render();
-    } else if (role === 'sewdot') {
-      const n = Number(id);
-      const expected = state.sewOrder.length + 1;
-      if (n === expected) {
-        state.sewOrder.push(n);
-        playStitch();
-        if (state.sewOrder.length === state.sewPoints.length) {
-          playSuccess();
-          setTimeout(() => { if (state.screen === 'sew') goto('outfitstyle'); }, 900);
-        }
-      } else {
-        playWrong();
-      }
-      render();
+// ---- 3D stage hit handling (strand cuts, sew dots) ----
+stage3d.setHitHandler((userData) => {
+  if (userData.role === 'strand' && state.screen === 'trim') {
+    stage3d.removeStrand(userData.id);
+    state.strandsRemaining -= 1;
+    playSnip();
+    if (state.strandsRemaining <= 0) {
+      playSuccess();
+      setTimeout(() => { if (state.screen === 'trim') goto('hairstyle'); }, 900);
     }
-    return;
+    render();
+  } else if (userData.role === 'sewdot' && state.screen === 'sew') {
+    const expected = state.sewOrder.length + 1;
+    if (userData.id === expected) {
+      state.sewOrder.push(userData.id);
+      stage3d.connectSewDot(userData.id);
+      playStitch();
+      if (state.sewOrder.length === SEW_COUNT) {
+        playSuccess();
+        setTimeout(() => { if (state.screen === 'sew') goto('outfitstyle'); }, 900);
+      } else {
+        render();
+      }
+    } else {
+      playWrong();
+    }
   }
+});
+
+app.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
 
   const action = target.dataset.action;
   if (action === 'nav') {
@@ -321,27 +349,31 @@ app.addEventListener('click', (e) => {
   } else if (action === 'pick-species') {
     playClick();
     state.species = target.dataset.id;
-    state.strands = randomStrands(8);
     goto('trim');
   } else if (action === 'pick-hair') {
     playClick();
     state.hair.style = target.dataset.id;
+    syncStage();
     render();
   } else if (action === 'pick-hair-color') {
     playClick();
     state.hair.color = target.dataset.id;
+    syncStage();
     render();
   } else if (action === 'pick-outfit') {
     playClick();
     state.outfit.style = target.dataset.id;
+    syncStage();
     render();
   } else if (action === 'pick-outfit-color') {
     playClick();
     state.outfit.color = target.dataset.id;
+    syncStage();
     render();
   } else if (action === 'pick-pattern') {
     playClick();
     state.outfit.pattern = target.dataset.id;
+    syncStage();
     render();
   } else if (action === 'rate') {
     playStar();
@@ -354,9 +386,7 @@ app.addEventListener('click', (e) => {
     const entry = {
       id: `look-${Date.now()}`,
       date: new Date().toISOString(),
-      species: state.species,
-      hair: { ...state.hair },
-      outfit: { ...state.outfit },
+      thumbnail: stage3d.captureSnapshot(),
       hairRating: state.hairRating,
       outfitRating: state.outfitRating,
     };

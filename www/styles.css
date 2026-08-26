@@ -151,6 +151,20 @@ button {
   display: block;
 }
 
+.stage-slot {
+  width: 100%;
+  aspect-ratio: 25 / 32;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fbe4ee, #f3d6e7);
+}
+
+.stage-slot canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .hint {
   text-align: center;
   color: var(--ink-soft);

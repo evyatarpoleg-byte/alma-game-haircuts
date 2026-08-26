@@ -1,14 +1,17 @@
-const CACHE_NAME = 'alma-salon-v5';
+const CACHE_NAME = 'alma-salon-v6';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=5',
+  './styles.css?v=6',
   './manifest.webmanifest',
   './icons/icon.svg',
-  './js/game.js?v=5',
-  './js/characters.js?v=5',
-  './js/audio.js?v=5',
-  './js/storage.js?v=5',
+  './js/game.js?v=6',
+  './js/characters.js?v=6',
+  './js/character3d.js?v=6',
+  './js/stage3d.js?v=6',
+  './js/audio.js?v=6',
+  './js/storage.js?v=6',
+  './js/vendor/three.module.min.js',
 ];
 
 self.addEventListener('install', (event) => {
