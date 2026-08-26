@@ -64,6 +64,22 @@ function accentFor(hex) {
   return luminance(hex) > 0.6 ? '#5A4A57' : '#FFFFFF';
 }
 
+function lighten(hex, amt) {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  const mix = (v) => Math.round(v + (255 - v) * amt);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
+const EYE_COLORS = {
+  girl: '#8B5E3C',
+  cat: '#4CAF6D',
+  dog: '#3FA9F5',
+  bunny: '#E0637D',
+};
+
 let patternCounter = 0;
 function patternDef(patternId, color) {
   if (patternId === 'plain') return { fill: color, defs: '' };
@@ -95,7 +111,18 @@ function patternDef(patternId, color) {
 }
 
 // ---- Hair (drawn centered on a head at hx,hy with radius hr) ----
+// A soft light patch layered on top of the base silhouette, for that
+// glossy cel-shaded look anime hair usually has.
+function hairShine(hx, hy, hr, color) {
+  const shine = lighten(color, 0.55);
+  return `<ellipse cx="${hx - hr * 0.32}" cy="${hy - hr * 0.62}" rx="${hr * 0.32}" ry="${hr * 0.18}" fill="${shine}" opacity="0.65" transform="rotate(-24 ${hx - hr * 0.32} ${hy - hr * 0.62})"/>`;
+}
+
 function hairShape(style, color, hx, hy, hr) {
+  return hairBase(style, color, hx, hy, hr) + hairShine(hx, hy, hr, color);
+}
+
+function hairBase(style, color, hx, hy, hr) {
   switch (style) {
     case 'pony':
       return `
@@ -224,15 +251,29 @@ function speciesExtras(speciesId, skin, shade) {
   return parts;
 }
 
-function faceFeatures() {
+// Big glossy anime-style eyes: white base, coloured iris, dark pupil,
+// two highlight sparkles, a bold top-lid line and a thin eyebrow.
+function animeEye(cx, cy, irisColor, mirrored) {
+  const flick = mirrored ? -1 : 1;
   return `
-    <circle cx="130" cy="132" r="6.5" fill="#2B2B2B"/>
-    <circle cx="170" cy="132" r="6.5" fill="#2B2B2B"/>
-    <circle cx="132.5" cy="129.5" r="2" fill="#fff"/>
-    <circle cx="172.5" cy="129.5" r="2" fill="#fff"/>
-    <path d="M 132 158 Q 150 172 168 158" stroke="#B5495B" stroke-width="5" fill="none" stroke-linecap="round"/>
-    <circle cx="104" cy="150" r="11" fill="#FF9FB8" opacity="0.6"/>
-    <circle cx="196" cy="150" r="11" fill="#FF9FB8" opacity="0.6"/>
+    <ellipse cx="${cx}" cy="${cy}" rx="13" ry="15" fill="#FFFFFF" stroke="#3A2E39" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cy + 2.5}" r="9.5" fill="${irisColor}"/>
+    <circle cx="${cx}" cy="${cy + 2.5}" r="4.4" fill="#2B2B2B"/>
+    <circle cx="${cx - 3.2}" cy="${cy - 1}" r="3" fill="#FFFFFF"/>
+    <circle cx="${cx + 2.4}" cy="${cy + 5.5}" r="1.4" fill="#FFFFFF" opacity="0.9"/>
+    <path d="M ${cx - 13} ${cy - 2} Q ${cx} ${cy - 19} ${cx + 13} ${cy - 2}" stroke="#3A2E39" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M ${cx - 11 * flick} ${cy - 23} Q ${cx} ${cy - 28} ${cx + 11 * flick} ${cy - 21}" stroke="#3A2E39" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  `;
+}
+
+function faceFeatures(speciesId) {
+  const iris = EYE_COLORS[speciesId] || EYE_COLORS.girl;
+  return `
+    ${animeEye(128, 131, iris, true)}
+    ${animeEye(172, 131, iris, false)}
+    <path d="M 138 160 Q 150 168 162 160" stroke="#B5495B" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <circle cx="102" cy="150" r="10" fill="#FF9FB8" opacity="0.55"/>
+    <circle cx="198" cy="150" r="10" fill="#FF9FB8" opacity="0.55"/>
   `;
 }
 
@@ -244,7 +285,7 @@ function faceFeatures() {
 export function buildCharacterSVG(config, overlayMarkup = '') {
   const sp = getSpecies(config.species);
   const extras = speciesExtras(sp.id, sp.skin, sp.skinShade);
-  const hair = config.hair && config.hair.style ? hairShape(config.hair.style, config.hair.color, 150, 130, 58) : '';
+  const hair = config.hair && config.hair.style ? hairShape(config.hair.style, config.hair.color, HEAD_CX, HEAD_CY, HEAD_R) : '';
   let outfitMarkup = '';
   let defs = '';
   if (config.outfit && config.outfit.style) {
@@ -269,9 +310,9 @@ export function buildCharacterSVG(config, overlayMarkup = '') {
     <!-- ears behind head -->
     ${extras.earsBack}
     <!-- head -->
-    <circle cx="150" cy="130" r="58" fill="${sp.skin}"/>
+    <circle cx="${HEAD_CX}" cy="${HEAD_CY}" r="${HEAD_R}" fill="${sp.skin}"/>
     ${extras.snout}
-    ${faceFeatures()}
+    ${faceFeatures(sp.id)}
     ${extras.whiskers || ''}
     <!-- hair -->
     ${hair}
@@ -279,27 +320,48 @@ export function buildCharacterSVG(config, overlayMarkup = '') {
   </svg>`;
 }
 
+// Messy stray hairs, rooted at the scalp along the top arc of the head
+// (not floating in a ring disconnected from it), poking outward like
+// little flyaway cowlicks that stick up before the haircut.
+const HEAD_CX = 150;
+const HEAD_CY = 130;
+const HEAD_R = 58;
+
 export function randomStrands(count = 8) {
   const strands = [];
+  const startDeg = -160;
+  const endDeg = -20;
   for (let i = 0; i < count; i += 1) {
-    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.3 - 0.15);
-    const dist = 62 + Math.random() * 14;
-    const x = 150 + Math.cos(angle) * dist;
-    const y = 92 + Math.sin(angle) * dist * 0.85;
-    strands.push({ id: `s${i}`, x, y, rot: (angle * 180) / Math.PI });
+    const t = count === 1 ? 0.5 : i / (count - 1);
+    const spread = (endDeg - startDeg) / count;
+    const deg = startDeg + t * (endDeg - startDeg) + (Math.random() - 0.5) * spread * 0.7;
+    const angle = (deg * Math.PI) / 180;
+    const baseR = HEAD_R * (0.8 + Math.random() * 0.14);
+    const bx = HEAD_CX + Math.cos(angle) * baseR;
+    const by = HEAD_CY + Math.sin(angle) * baseR * 0.92;
+    const curl = Math.random() < 0.5 ? -1 : 1;
+    strands.push({ id: `s${i}`, bx, by, angleDeg: deg, curl });
   }
   return strands;
 }
 
 export function strandsOverlay(strands) {
   return strands
-    .map(
-      (s) => `
-      <g class="strand" data-role="strand" data-id="${s.id}" transform="translate(${s.x} ${s.y}) rotate(${s.rot})">
-        <rect x="-3" y="-16" width="6" height="32" rx="3" fill="#6B3F1D" stroke="#4A2A10" stroke-width="1"/>
-        <circle r="15" fill="transparent"/>
-      </g>`
-    )
+    .map((s) => {
+      const rad = (s.angleDeg * Math.PI) / 180;
+      const len = 26 + Math.random() * 6;
+      const tipX = s.bx + Math.cos(rad) * len;
+      const tipY = s.by + Math.sin(rad) * len;
+      const perpX = -Math.sin(rad) * 12 * s.curl;
+      const perpY = Math.cos(rad) * 12 * s.curl;
+      const ctrlX = (s.bx + tipX) / 2 + perpX;
+      const ctrlY = (s.by + tipY) / 2 + perpY;
+      return `
+      <g data-role="strand" data-id="${s.id}">
+        <path d="M ${s.bx} ${s.by} Q ${ctrlX} ${ctrlY} ${tipX} ${tipY}" fill="none" stroke="#6B3F1D" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="${tipX}" cy="${tipY}" r="16" fill="transparent"/>
+      </g>`;
+    })
     .join('');
 }
 
