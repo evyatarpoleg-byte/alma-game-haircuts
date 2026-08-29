@@ -8,7 +8,7 @@ import {
   buildCharacter, disposeCharacter,
   buildStrandTargets, removeStrandTarget,
   buildSewDotTargets, markSewDotDone, updateSewLine, clearSewLine,
-} from './character3d.js?v=7';
+} from './character3d.js?v=8';
 
 const canvas = document.createElement('canvas');
 canvas.id = 'stage3d';

@@ -3,7 +3,7 @@
 // it stays lightweight enough for any Android phone while looking like a
 // rounded, natural collectible figure rather than a flat drawing.
 import * as THREE from './vendor/three.module.min.js';
-import { getSpecies, EYE_COLORS, accentFor } from './characters.js?v=7';
+import { getSpecies, EYE_COLORS, accentFor } from './characters.js?v=8';
 
 // ---- shared body proportions (natural-ish child, head ~31% of height) ----
 const FOOT_H = 0.12;
@@ -295,10 +295,10 @@ function addSpeciesExtras(group, sp, skin, skinDark) {
       }
     });
     buildTailCurve(group, [
-      new THREE.Vector3(0.18, hipY - 0.3, -0.32),
-      new THREE.Vector3(0.32, hipY - 0.05, -0.42),
-      new THREE.Vector3(0.36, hipY + 0.4, -0.4),
-      new THREE.Vector3(0.24, hipY + 0.7, -0.3),
+      new THREE.Vector3(0.18, hipY - 0.25, -0.3),
+      new THREE.Vector3(0.3, hipY - 0.05, -0.4),
+      new THREE.Vector3(0.32, hipY + 0.18, -0.38),
+      new THREE.Vector3(0.22, hipY + 0.32, -0.28),
     ], 0.06, std(skin));
   } else if (sp.id === 'dog') {
     [-1, 1].forEach((side) => {
@@ -316,10 +316,10 @@ function addSpeciesExtras(group, sp, skin, skinDark) {
     nose.position.set(0, headY - HEAD_R * 0.24, HEAD_R * 0.96 + 0.17);
     group.add(nose);
     buildTailCurve(group, [
-      new THREE.Vector3(0, hipY - 0.2, -0.3),
-      new THREE.Vector3(0.05, hipY + 0.15, -0.44),
-      new THREE.Vector3(-0.05, hipY + 0.45, -0.4),
-      new THREE.Vector3(0.1, hipY + 0.62, -0.2),
+      new THREE.Vector3(0, hipY - 0.15, -0.28),
+      new THREE.Vector3(0.05, hipY + 0.05, -0.42),
+      new THREE.Vector3(-0.04, hipY + 0.2, -0.38),
+      new THREE.Vector3(0.08, hipY + 0.3, -0.24),
     ], 0.065, std(skin));
   } else if (sp.id === 'bunny') {
     [-1, 1].forEach((side) => {
@@ -344,7 +344,7 @@ function addSpeciesExtras(group, sp, skin, skinDark) {
       group.add(tooth);
     });
     const tail = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 14), std(skin));
-    tail.position.set(0, hipY + 0.15, -0.34);
+    tail.position.set(0, hipY + 0.05, -0.34);
     group.add(tail);
   }
 }
