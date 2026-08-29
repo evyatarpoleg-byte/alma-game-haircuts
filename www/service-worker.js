@@ -1,16 +1,16 @@
-const CACHE_NAME = 'alma-salon-v6';
+const CACHE_NAME = 'alma-salon-v7';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=6',
+  './styles.css?v=7',
   './manifest.webmanifest',
   './icons/icon.svg',
-  './js/game.js?v=6',
-  './js/characters.js?v=6',
-  './js/character3d.js?v=6',
-  './js/stage3d.js?v=6',
-  './js/audio.js?v=6',
-  './js/storage.js?v=6',
+  './js/game.js?v=7',
+  './js/characters.js?v=7',
+  './js/character3d.js?v=7',
+  './js/stage3d.js?v=7',
+  './js/audio.js?v=7',
+  './js/storage.js?v=7',
   './js/vendor/three.module.min.js',
 ];
 

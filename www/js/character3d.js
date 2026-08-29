@@ -3,7 +3,7 @@
 // it stays lightweight enough for any Android phone while looking like a
 // rounded, natural collectible figure rather than a flat drawing.
 import * as THREE from './vendor/three.module.min.js';
-import { getSpecies, EYE_COLORS, accentFor } from './characters.js?v=6';
+import { getSpecies, EYE_COLORS, accentFor } from './characters.js?v=7';
 
 // ---- shared body proportions (natural-ish child, head ~31% of height) ----
 const FOOT_H = 0.12;
@@ -396,8 +396,17 @@ function buildHair(group, style, colorHex) {
       add(buildTailCurve(group, curve, 0.115, mat()));
     });
   } else if (style === 'bob') {
-    add(new THREE.Mesh(new THREE.SphereGeometry(HEAD_R * 1.05, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.62), mat()))
+    // Crown: full coverage, but only down to a height safely above the
+    // eyes. Below that, a back+sides "curtain" continues down to the
+    // jaw while leaving an open wedge at the front for the face - a
+    // single full-circle sphere segment down to jaw height would bury
+    // the face texture under hair.
+    add(new THREE.Mesh(new THREE.SphereGeometry(HEAD_R * 1.05, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.3), mat()))
       .position.set(0, headY, 0);
+    add(new THREE.Mesh(
+      new THREE.SphereGeometry(HEAD_R * 1.05, 24, 16, Math.PI * (160 / 180), Math.PI * (220 / 180), Math.PI * 0.26, Math.PI * 0.36),
+      mat()
+    )).position.set(0, headY, 0);
   } else if (style === 'curly') {
     add(new THREE.Mesh(new THREE.SphereGeometry(HEAD_R * 1.0, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.4), mat()))
       .position.set(0, headY, 0);
@@ -414,15 +423,21 @@ function buildHair(group, style, colorHex) {
       add(bump);
     }
   } else if (style === 'mohawk') {
-    const stripCount = 5;
+    // A row of spikes along the sagittal midline, from just above the
+    // forehead, over the crown, down to the nape - each oriented to
+    // stick straight out of the scalp at its own point, tallest at the
+    // top of the head and tapering toward the front/back ends.
+    const stripCount = 7;
+    const center = new THREE.Vector3(0, headY, 0);
     for (let i = 0; i < stripCount; i++) {
       const t = i / (stripCount - 1);
-      const theta = Math.PI * (0.02 + t * 0.5);
-      const z = HEAD_R * Math.sin(theta) * (t < 0.5 ? -1 : 1) * (Math.abs(t - 0.5) * 2);
-      const y = headY + HEAD_R * Math.cos(theta) + 0.12;
-      const h = 0.34 - t * 0.14;
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.09, h, 8), mat());
-      spike.position.set(0, y, z * 0.55);
+      const angle = ((25 + t * 130) * Math.PI) / 180; // 0deg=front equator, 90deg=crown, 180deg=back equator
+      const dir = new THREE.Vector3(0, Math.sin(angle), Math.cos(angle));
+      const base = center.clone().addScaledVector(dir, HEAD_R * 1.0);
+      const h = 0.14 + 0.24 * Math.sin(t * Math.PI);
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.085, h, 8), mat());
+      spike.position.copy(base.addScaledVector(dir, h / 2));
+      spike.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
       add(spike);
     }
   } else if (style === 'bun') {
@@ -495,40 +510,69 @@ function buildBelt(group, y, colorHex = '#3a2e39') {
   group.add(belt);
 }
 
+// A snug sleeveless layer covering the torso - used as the base under
+// outfits (cape, overalls) whose own pieces don't fully wrap the torso
+// on their own, so the bare body never shows through.
+function buildTank(group, colorHex, pattern, hem = hipY - 0.05) {
+  const mat = fabricMaterial(colorHex, pattern, 2, 1.2);
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.265, 0.32, shoulderY - hem, 22, 1, true), mat);
+  tank.position.set(0, (shoulderY + hem) / 2, 0);
+  group.add(tank);
+  return hem;
+}
+
 function buildOutfit(group, armParts, style, colorHex, pattern) {
   if (style === 'dress') {
     buildDress(group, armParts, colorHex, pattern);
   } else if (style === 'tshirt') {
-    const hem = buildShirt(group, armParts, colorHex, pattern);
+    // A short, boxy tee (little taper) meeting a separately-flared skirt
+    // at a visible waistband ring, so the two-piece look reads clearly
+    // different from the one-piece dress's smooth, seamless taper.
+    const hem = hipY + 0.05;
+    const mat = fabricMaterial(colorHex, pattern, 2, 1);
+    const shirt = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.30, shoulderY - hem, 22, 1, true), mat);
+    shirt.position.set(0, (shoulderY + hem) / 2, 0);
+    group.add(shirt);
+    armParts.forEach((a) => {
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 14), mat);
+      sleeve.position.set(a.x, a.topY - 0.05, 0);
+      group.add(sleeve);
+    });
+    buildBelt(group, hem, darkenHex(colorHex, 0.25));
+
     const skirtMat = fabricMaterial(darkenHex(colorHex, 0.12), pattern, 3, 1.4);
-    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.335, 0.7, 0.46, 26, 1, true), skirtMat);
-    skirt.position.set(0, hem - 0.23, 0);
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.75, 0.5, 26, 1, true), skirtMat);
+    skirt.position.set(0, hem - 0.25, 0);
     group.add(skirt);
-    const skirtCap = new THREE.Mesh(new THREE.CircleGeometry(0.7, 26), skirtMat);
+    const skirtCap = new THREE.Mesh(new THREE.CircleGeometry(0.75, 26), skirtMat);
     skirtCap.rotation.x = Math.PI / 2;
-    skirtCap.position.set(0, hem - 0.46, 0);
+    skirtCap.position.set(0, hem - 0.5, 0);
     group.add(skirtCap);
   } else if (style === 'overalls') {
+    // A plain undershirt first, so the torso/shoulders are never bare -
+    // the overalls (pants + bib + straps) then layer on top of it.
+    buildTank(group, '#fff6ea', 'plain', hipY - 0.05);
     buildPants(group, { colorHex, pattern, topY: hipY + 0.4, bottomY: 0.16 });
     const bibMat = fabricMaterial(colorHex, pattern, 1, 1);
     const bib = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.42, 0.08), bibMat);
-    bib.position.set(0, hipY + 0.21, 0.28);
+    bib.position.set(0, hipY + 0.21, 0.29);
     group.add(bib);
     [-1, 1].forEach((side) => {
       const strap = new THREE.Mesh(new THREE.BoxGeometry(0.08, shoulderY - (hipY + 0.42), 0.05), bibMat);
-      strap.position.set(side * 0.13, (shoulderY + hipY + 0.42) / 2, 0.25);
+      strap.position.set(side * 0.13, (shoulderY + hipY + 0.42) / 2, 0.26);
       group.add(strap);
     });
     const button = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), std('#f4c430', 0.3, 0.6));
-    button.position.set(0, hipY + 0.42, 0.32);
+    button.position.set(0, hipY + 0.42, 0.33);
     group.add(button);
   } else if (style === 'jumpsuit') {
     const hem = buildShirt(group, armParts, colorHex, pattern, { hem: hipY - 0.02 });
     buildPants(group, { colorHex, pattern, topY: hem + 0.03, bottomY: 0.16 });
-    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.03, shoulderY - 0.16, 0.02), std(darkenHex(colorHex, 0.3), 0.5));
-    seam.position.set(0, (shoulderY + 0.16) / 2, 0.32);
-    group.add(seam);
   } else if (style === 'cape') {
+    // A snug top (matching the cape's colour, like a hero costume) so
+    // the torso is fully covered, with shorts below and the cape
+    // draped over the shoulders and down the back.
+    buildTank(group, colorHex, pattern, hipY - 0.05);
     buildPants(group, { colorHex, pattern, topY: hipY + 0.02, bottomY: hipY - 0.35 });
     buildBelt(group, hipY + 0.02, darkenHex(colorHex, 0.2));
     const capeMat = fabricMaterial(colorHex, pattern, 2, 2);

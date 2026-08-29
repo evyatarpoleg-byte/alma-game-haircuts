@@ -1,10 +1,10 @@
 import {
   SPECIES, HAIRSTYLES, OUTFITS, PATTERNS, COLORS,
   hairIcon, outfitIcon, patternSwatch,
-} from './characters.js?v=6';
-import { playSnip, playStitch, playWrong, playSuccess, playClick, playStar, playSave } from './audio.js?v=6';
-import { loadGallery, saveEntry, deleteEntry } from './storage.js?v=6';
-import * as stage3d from './stage3d.js?v=6';
+} from './characters.js?v=7';
+import { playSnip, playStitch, playWrong, playSuccess, playClick, playStar, playSave } from './audio.js?v=7';
+import { loadGallery, saveEntry, deleteEntry } from './storage.js?v=7';
+import * as stage3d from './stage3d.js?v=7';
 
 const STEP_SCREENS = ['trim', 'hairstyle', 'sew', 'outfitstyle'];
 const STRAND_COUNT = 8;
